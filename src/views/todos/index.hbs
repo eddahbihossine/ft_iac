@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IaC-1 Todo App</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet"
+    integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
+</head>
+
+<body>
+  <div class="container-fluid">
+    <div class="row">
+      <h1>{{username}} todos list</h1>
+      {{#each todos as |todo|}}
+      {{!-- Todo card --}}
+      <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 col-12">
+        <div class="card mb-3">
+          <div class="card-body">
+            <h4 class="card-title">
+              {{todo.title}}
+              <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-light">
+                {{todo.id}}
+              </span>
+            </h4>
+            <p class="card-text">{{todo.description}}</p>
+          </div>
+          <div class="card-footer">
+            <div class="hstack justify-content-around">
+              <input class="todo-checkbox align-middle" type="checkbox" {{#if todo.completed}}checked{{/if}}
+                data-todo-id="{{todo.id}}" style="transform: scale(3)" />
+              <script>
+                document.querySelector('input[data-todo-id="{{todo.id}}"]').addEventListener('change', function (e) {
+                  var todoId = +e.target.dataset.todoId;
+                  var isCompleted = e.target.checked;
+                  var request = new XMLHttpRequest();
+                  request.open('PATCH', '/todos/' + todoId);
+                  request.setRequestHeader('Content-Type', 'application/json');
+                  request.send(JSON.stringify({ completed: isCompleted }));
+                });
+              </script>
+              <button class="todo-delete-button btn btn-danger" data-todo-id="{{todo.id}}">Delete</button>
+              <script>
+                document.querySelector('button[data-todo-id="{{todo.id}}"]').addEventListener('click', function (e) {
+                  var todoId = +e.target.dataset.todoId;
+                  var request = new XMLHttpRequest();
+                  request.open('DELETE', '/todos/' + todoId);
+                  request.send();
+                  request.onload = () => {
+                    window.location.reload();
+                  };
+                });
+              </script>
+            </div>
+          </div>
+        </div>
+      </div>
+      {{/each}}
+    </div>
+
+    <hr />
+
+    <div class="row justify-content-center">
+      <div class="card col-xl-3 col-lg-4 col-md-6 col-sm-8 col-12">
+        <div class="card-body">
+          <h3 class="card-title">New Todo</h3>
+          <form method="POST">
+            <input type="text" class="form-control mb-3" name="title" placeholder="Title" />
+            <input type="text" class="form-control mb-3" name="description" placeholder="Description" />
+            <input type="submit" class="btn btn-success" value="Create todo" />
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-pprn3073KE6tl6bjs2QrFaJGz5/SUsLqktiwsUTF55Jfv3qYSDhgCecCxMW52nD2"
+      crossorigin="anonymous"></script>
+  </div>
+</body>
+
+</html>

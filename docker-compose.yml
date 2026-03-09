@@ -1,0 +1,69 @@
+
+services:
+  api:
+    build:
+      context: .
+      target: production
+    container_name: nest_api
+    env_file: .env.local
+    environment:
+      MYSQL_HOST: db
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    networks:
+      - app_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      start_period: 40s
+      retries: 3
+    # Removed deploy.resource CPU limits to avoid NanoCPUs errors on kernels
+    # that don't expose the CPU CFS scheduler or mount cgroups.
+
+  db:
+    image: mysql:8.0
+    container_name: mysql_db
+    restart: always
+    env_file: .env.local
+    # Port removed for security - only accessible within Docker network
+    # Uncomment below if external access is needed:
+    # ports:
+    #   - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - app_network
+    healthcheck:
+      # Use container env var for password so we don't need host-time substitution
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # Removed deploy.resource CPU limits to avoid NanoCPUs errors on kernels
+    # that don't expose the CPU CFS scheduler or mount cgroups.
+
+  adminer:
+    image: adminer
+    container_name: adminer_ui
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app_network
+    # Removed deploy.resource CPU limits to avoid NanoCPUs errors on kernels
+    # that don't expose the CPU CFS scheduler or mount cgroups.
+
+networks:
+  app_network:
+
+volumes:
+  mysql_data:

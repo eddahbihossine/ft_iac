@@ -1,0 +1,20 @@
+.git
+.DS_Store
+.env*
+node_modules/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl
+
+# SSH keys
+terraform/hossine
+terraform/hossine.pub
