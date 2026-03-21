@@ -5,17 +5,39 @@ terraform {
       source  = "hashicorp/aws"
       version = ">= 4.0"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = ">= 3.0"
+    }
   }
 }
 
+locals {
+  app_deploy_hash = sha256(join("", concat(
+    [
+      filesha256("${path.module}/../docker-compose.yml"),
+      filesha256("${path.module}/../dockerfile"),
+      filesha256("${path.module}/../.env.local"),
+      filesha256("${path.module}/../package.json"),
+      filesha256("${path.module}/../pnpm-lock.yaml"),
+      filesha256("${path.module}/../tsconfig.json"),
+      filesha256("${path.module}/../tsconfig.build.json"),
+      filesha256("${path.module}/../nest-cli.json")
+    ],
+    [for file in sort(fileset("${path.module}/../src", "**")) : filesha256("${path.module}/../src/${file}")]
+  )))
+}
+
 provider "aws" {
-  region = var.aws_region
+  region  = var.aws_region
+  profile = var.aws_profile
 }
 
 # Provider alias for us-east-1 (required for CloudFront ACM certificates)
 provider "aws" {
-  alias  = "us_east_1"
-  region = "us-east-1"
+  alias   = "us_east_1"
+  region  = "us-east-1"
+  profile = var.aws_profile
 }
 
 resource "aws_iam_role" "ssm_role" {
@@ -40,9 +62,9 @@ resource "aws_iam_instance_profile" "ssm_profile" {
   role = aws_iam_role.ssm_role.name
 }
 
-resource "aws_key_pair" "hossine" {
-  key_name   = "hossine"
-  public_key = file("${path.module}/hossine.pub")
+resource "aws_key_pair" "deployer" {
+  key_name   = var.ssh_key_name
+  public_key = file(pathexpand(var.ssh_public_key_path))
 }
 
 resource "aws_security_group" "ec2_sg" {
@@ -101,6 +123,14 @@ resource "aws_security_group" "alb_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  ingress {
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -113,9 +143,9 @@ resource "aws_security_group" "alb_sg" {
 
 resource "aws_instance" "example" {
   ami                         = "ami-05d43d5e94bb6eb95"
-  instance_type               = "t2.micro"
+  instance_type               = "t3.micro"
   iam_instance_profile        = aws_iam_instance_profile.ssm_profile.name
-  key_name                    = aws_key_pair.hossine.key_name
+  key_name                    = aws_key_pair.deployer.key_name
   subnet_id                   = aws_subnet.public["0"].id
   vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
   associate_public_ip_address = true
@@ -138,29 +168,43 @@ resource "aws_instance" "example" {
     chmod +x /usr/local/bin/docker-compose
     ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
 
+    # Add swap so Docker builds are less likely to stall on small instances.
+    fallocate -l 1G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=1024
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
     # Signal that Docker setup is complete
     touch /home/ec2-user/.docker-ready
   EOF
 
   tags = { Name = "${var.environment}-ec2" }
+}
 
-  # Wait for the instance to be reachable via SSH
+resource "null_resource" "app_deploy" {
+  depends_on = [aws_instance.example]
+
+  triggers = {
+    instance_id = aws_instance.example.id
+    app_hash    = local.app_deploy_hash
+  }
+
   connection {
     type        = "ssh"
     user        = "ec2-user"
-    private_key = file("${path.module}/hossine")
-    host        = self.public_ip
+    private_key = file(pathexpand(var.ssh_private_key_path))
+    host        = aws_instance.example.public_ip
     timeout     = "5m"
   }
 
-  # Create the app directory first
   provisioner "remote-exec" {
     inline = [
-      "mkdir -p /home/ec2-user/app/src",
+      "mkdir -p /home/ec2-user/app",
+      "rm -rf /home/ec2-user/app/src",
     ]
   }
 
-  # Copy the entire project to the instance
   provisioner "file" {
     source      = "${path.module}/../docker-compose.yml"
     destination = "/home/ec2-user/app/docker-compose.yml"
@@ -206,14 +250,13 @@ resource "aws_instance" "example" {
     destination = "/home/ec2-user/app"
   }
 
-  # Wait for Docker to be ready, then start the app with docker-compose
   provisioner "remote-exec" {
     inline = [
       "echo 'Waiting for Docker to be ready...'",
       "while [ ! -f /home/ec2-user/.docker-ready ]; do sleep 2; done",
       "sleep 5",
       "cd /home/ec2-user/app",
-      "sudo docker-compose --env-file .env.local up -d --build 2>&1 || true",
+      "sudo docker-compose --env-file .env.local up -d --build --force-recreate",
       "echo 'Waiting for services to start...'",
       "sleep 30",
       "echo '=== Container status ==='",

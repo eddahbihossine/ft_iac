@@ -4,6 +4,38 @@ variable "aws_region" {
   default     = "eu-west-3"
 }
 
+variable "aws_profile" {
+  description = "Optional AWS shared config profile name to use for authentication (e.g. 'newacct'). If null, Terraform uses the default AWS credential chain."
+  type        = string
+  default     = null
+}
+
+variable "ssh_key_name" {
+  description = "Name of the EC2 key pair created for Terraform deployments"
+  type        = string
+  default     = "terraform-deployer"
+}
+
+variable "ssh_public_key_path" {
+  description = "Path to the public SSH key used to create the EC2 key pair"
+  type        = string
+
+  validation {
+    condition     = length(trimspace(var.ssh_public_key_path)) > 0
+    error_message = "Set ssh_public_key_path to a public key file accessible from the machine running Terraform."
+  }
+}
+
+variable "ssh_private_key_path" {
+  description = "Path to the private SSH key used by Terraform provisioners to connect to the EC2 instance"
+  type        = string
+
+  validation {
+    condition     = length(trimspace(var.ssh_private_key_path)) > 0
+    error_message = "Set ssh_private_key_path to a private key file accessible from the machine running Terraform."
+  }
+}
+
 variable "environment" {
   description = "Deployment environment name"
   type        = string

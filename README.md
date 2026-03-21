@@ -7,7 +7,8 @@ Web app for the IaC-1 project.
 ## Installation
 
 ```bash
-$ npm install
+$ corepack enable
+$ pnpm install --frozen-lockfile
 ```
 
 ## Running the app
@@ -16,19 +17,19 @@ $ npm install
 
 **Run the app in development mode**
 ```bash
-npm run start
+pnpm start
 ```
 
 **Or with watch mode**
 ```bash
-npm run start:dev
+pnpm start:dev
 ```
 
 ### Production environment
 
 ```bash
-npm run build
-npm run start:prod
+pnpm build
+pnpm start:prod
 ```
 
 ## Environment Variables
@@ -36,6 +37,7 @@ npm run start:prod
 Files to store environment variables in:
 * `.env`
 * `.env.local`
+* `.env.example` contains a safe template for new machines
 
 ### App
 * **PORT** = port to run the app on
@@ -72,12 +74,12 @@ Unit tests are written with **Jest** and can be run without application running 
 
 **Command to run unit tests**
 ```bash
-npm run test
+pnpm test
 ```
 
 **Command to run unit tests with watch mode**
 ```bash
-npm run test:watch
+pnpm test:watch
 ```
 
 ### E2E tests
@@ -86,13 +88,17 @@ E2E tests are written with **Playwright** and can't be run without application r
 
 **Command to run headless E2E tests**
 ```bash
-npm run test:e2e
+pnpm test:e2e
 ```
 
 **Command to run E2E tests with browser**
 ```bash
-npm run test:e2e:ui
+pnpm test:e2e:ui
 ```
+
+## Tooling
+
+- Node.js 18 is the expected runtime. Use the `.nvmrc` file or your version manager of choice to match it.
 
 
 ## Stack

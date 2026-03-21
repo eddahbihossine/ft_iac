@@ -1,0 +1,15 @@
+aws_region = "eu-west-3"
+environment = "dev"
+
+# Leave unset to use the default AWS credential chain or export AWS_PROFILE.
+# aws_profile = "your-profile"
+
+ssh_key_name         = "terraform-deployer"
+ssh_public_key_path  = "~/.ssh/id_ed25519.pub"
+ssh_private_key_path = "~/.ssh/id_ed25519"
+
+# Optional DNS / TLS settings
+# hosted_zone_id = "Z1234567890"
+# domain_name    = "app.example.com"
+
+enable_cloudfront = false

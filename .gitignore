@@ -1,20 +1,30 @@
 .git
 .DS_Store
 .env*
+dist/
+coverage/
+logs/
+playwright-report/
+test-results/
 node_modules/
 
 # Terraform
 .terraform/
 *.tfstate
 *.tfstate.backup
+*.tfplan
 *.tfvars
 crash.log
 override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
-.terraform.lock.hcl
 
-# SSH keys
+# Local deployment keys
 terraform/hossine
-terraform/hossine.pub
+terraform/*.key
+terraform/*.pem
+terraform/*.pub
+
+# Local AWS credentials/config for Terraform
+terraform/.aws/

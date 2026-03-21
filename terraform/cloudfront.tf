@@ -1,9 +1,5 @@
-resource "aws_cloudfront_origin_access_identity" "oai" {
-  comment = "OAI for ${var.environment}"
-}
-
 resource "aws_cloudfront_distribution" "cdn" {
-  count = var.enable_cloudfront ? 1 : 0
+  count               = var.enable_cloudfront ? 1 : 0
   enabled             = true
   is_ipv6_enabled     = true
   comment             = "CDN for ${var.domain_name}"
@@ -31,9 +27,9 @@ resource "aws_cloudfront_distribution" "cdn" {
       }
     }
     viewer_protocol_policy = "redirect-to-https"
-    min_ttl     = 0
-    default_ttl = 3600
-    max_ttl     = 86400
+    min_ttl                = 0
+    default_ttl            = 3600
+    max_ttl                = 86400
   }
 
   restrictions {

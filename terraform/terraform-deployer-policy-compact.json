@@ -1,0 +1,33 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "sts:GetCallerIdentity",
+        "ec2:*",
+        "elasticloadbalancing:*",
+        "route53:*",
+        "acm:*",
+        "cloudfront:*",
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:CreateServiceLinkedRole",
+        "iam:Get*",
+        "iam:List*",
+        "iam:UpdateRole",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:CreateInstanceProfile",
+        "iam:DeleteInstanceProfile",
+        "iam:AddRoleToInstanceProfile",
+        "iam:RemoveRoleFromInstanceProfile",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:PassRole"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

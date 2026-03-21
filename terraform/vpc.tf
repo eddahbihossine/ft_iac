@@ -9,15 +9,15 @@ resource "aws_vpc" "main" {
 
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.main.id
-  tags = { Name = "${var.environment}-igw" }
+  tags   = { Name = "${var.environment}-igw" }
 }
 
 resource "aws_subnet" "public" {
-  for_each = { for idx, cidr in var.public_subnets : idx => cidr }
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = each.value
+  for_each                = { for idx, cidr in var.public_subnets : idx => cidr }
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = each.value
   map_public_ip_on_launch = true
-  availability_zone = element(data.aws_availability_zones.available.names, tonumber(each.key))
+  availability_zone       = element(data.aws_availability_zones.available.names, tonumber(each.key))
   tags = {
     Name = "${var.environment}-public-${each.key}"
   }
@@ -35,7 +35,7 @@ resource "aws_route_table" "public" {
 }
 
 resource "aws_route_table_association" "public_assoc" {
-  for_each = aws_subnet.public
+  for_each       = aws_subnet.public
   subnet_id      = each.value.id
   route_table_id = aws_route_table.public.id
 }
