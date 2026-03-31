@@ -11,5 +11,9 @@ output "route53_record" {
 }
 
 output "certificate_arn" {
-  value = length(aws_acm_certificate.site_cert) > 0 ? aws_acm_certificate.site_cert[0].arn : ""
+  value = var.enable_cloudfront ? (length(aws_acm_certificate.cloudfront_cert) > 0 ? aws_acm_certificate.cloudfront_cert[0].arn : "") : (length(aws_acm_certificate.site_cert) > 0 ? aws_acm_certificate.site_cert[0].arn : "")
+}
+
+output "https_endpoint" {
+  value = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 ? "https://${var.domain_name}" : (var.enable_cloudfront ? "https://${aws_cloudfront_distribution.cdn[0].domain_name}" : "")
 }

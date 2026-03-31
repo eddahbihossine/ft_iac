@@ -1,4 +1,4 @@
-.PHONY: help build up down restart logs logs-api logs-db logs-adminer clean rebuild shell-api shell-db ps health install test lint format
+.PHONY: help build up down restart logs logs-api logs-db logs-adminer clean rebuild shell-api shell-db ps health install test lint format tf-init tf-plan tf-apply tf-ssl-plan tf-ssl-apply
 
 # Default target
 help: ## Show this help message
@@ -112,3 +112,35 @@ quick-start: build up logs-api ## Build, start, and show API logs
 quick-restart: down up logs-api ## Stop, start, and show API logs
 
 full-reset: clean rebuild health ## Full cleanup and rebuild with health check
+
+# Terraform Operations
+TF_DIR ?= terraform
+
+tf-init: ## Initialize Terraform
+	cd $(TF_DIR) && terraform init
+
+tf-plan: ## Terraform plan using terraform.tfvars
+	cd $(TF_DIR) && terraform plan
+
+tf-apply: ## Terraform apply using terraform.tfvars
+	cd $(TF_DIR) && terraform apply
+
+tf-ssl-plan: ## Terraform plan for HTTPS (requires DOMAIN_NAME and HOSTED_ZONE_ID)
+	@if [ -z "$(DOMAIN_NAME)" ] || [ -z "$(HOSTED_ZONE_ID)" ]; then \
+		echo "Usage: make tf-ssl-plan DOMAIN_NAME=app.example.com HOSTED_ZONE_ID=Z123... [ENABLE_CLOUDFRONT=true]"; \
+		exit 1; \
+	fi
+	cd $(TF_DIR) && terraform plan \
+		-var="domain_name=$(DOMAIN_NAME)" \
+		-var="hosted_zone_id=$(HOSTED_ZONE_ID)" \
+		-var="enable_cloudfront=$(or $(ENABLE_CLOUDFRONT),false)"
+
+tf-ssl-apply: ## Terraform apply for HTTPS (requires DOMAIN_NAME and HOSTED_ZONE_ID)
+	@if [ -z "$(DOMAIN_NAME)" ] || [ -z "$(HOSTED_ZONE_ID)" ]; then \
+		echo "Usage: make tf-ssl-apply DOMAIN_NAME=app.example.com HOSTED_ZONE_ID=Z123... [ENABLE_CLOUDFRONT=true]"; \
+		exit 1; \
+	fi
+	cd $(TF_DIR) && terraform apply \
+		-var="domain_name=$(DOMAIN_NAME)" \
+		-var="hosted_zone_id=$(HOSTED_ZONE_ID)" \
+		-var="enable_cloudfront=$(or $(ENABLE_CLOUDFRONT),false)"

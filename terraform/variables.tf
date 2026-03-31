@@ -66,8 +66,33 @@ variable "domain_name" {
   default     = ""
 }
 
+check "tls_dns_inputs" {
+  assert {
+    condition = (
+      length(trimspace(var.domain_name)) == 0 &&
+      length(trimspace(var.hosted_zone_id)) == 0
+      ) || (
+      length(trimspace(var.domain_name)) > 0 &&
+      length(trimspace(var.hosted_zone_id)) > 0
+    )
+    error_message = "Set both domain_name and hosted_zone_id together to enable SSL/DNS, or leave both empty."
+  }
+}
+
 variable "enable_cloudfront" {
   description = "Whether to create a CloudFront distribution in front of the ALB"
   type        = bool
   default     = false
+}
+
+variable "alb_name" {
+  description = "Optional explicit ALB name. Leave empty to use a safe default that avoids common name collisions."
+  type        = string
+  default     = ""
+}
+
+variable "target_group_name" {
+  description = "Optional explicit ALB target group name. Leave empty to use a safe default that avoids common name collisions."
+  type        = string
+  default     = ""
 }

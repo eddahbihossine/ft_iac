@@ -29,15 +29,17 @@ locals {
 }
 
 provider "aws" {
-  region  = var.aws_region
-  profile = var.aws_profile
+  region                  = var.aws_region
+  profile                 = var.aws_profile
+  skip_metadata_api_check = true
 }
 
 # Provider alias for us-east-1 (required for CloudFront ACM certificates)
 provider "aws" {
-  alias   = "us_east_1"
-  region  = "us-east-1"
-  profile = var.aws_profile
+  alias                   = "us_east_1"
+  region                  = "us-east-1"
+  profile                 = var.aws_profile
+  skip_metadata_api_check = true
 }
 
 resource "aws_iam_role" "ssm_role" {

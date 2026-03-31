@@ -1,5 +1,5 @@
 resource "aws_lb" "app_alb" {
-  name               = "${var.environment}-alb"
+  name               = length(var.alb_name) > 0 ? var.alb_name : "${var.environment}-alb-iac"
   internal           = false
   load_balancer_type = "application"
   subnets            = [for s in aws_subnet.public : s.id]
@@ -8,7 +8,7 @@ resource "aws_lb" "app_alb" {
 }
 
 resource "aws_lb_target_group" "app_tg" {
-  name     = "${var.environment}-tg"
+  name     = length(var.target_group_name) > 0 ? var.target_group_name : "${var.environment}-tg-iac"
   port     = 3000
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
@@ -25,7 +25,7 @@ resource "aws_lb_target_group" "app_tg" {
 }
 
 resource "aws_lb_listener" "http" {
-  count             = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 ? 0 : 1
+  count             = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 && !var.enable_cloudfront ? 0 : 1
   load_balancer_arn = aws_lb.app_alb.arn
   port              = "80"
   protocol          = "HTTP"
@@ -36,7 +36,7 @@ resource "aws_lb_listener" "http" {
 }
 
 resource "aws_lb_listener" "http_redirect" {
-  count             = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 ? 1 : 0
+  count             = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 && !var.enable_cloudfront ? 1 : 0
   load_balancer_arn = aws_lb.app_alb.arn
   port              = "80"
   protocol          = "HTTP"
@@ -53,7 +53,7 @@ resource "aws_lb_listener" "http_redirect" {
 }
 
 resource "aws_lb_listener" "https" {
-  count             = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 ? 1 : 0
+  count             = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 && !var.enable_cloudfront ? 1 : 0
   load_balancer_arn = aws_lb.app_alb.arn
   port              = "443"
   protocol          = "HTTPS"
@@ -72,10 +72,6 @@ resource "aws_lb_target_group_attachment" "ec2_attach" {
   port             = 3000
 }
 
-output "alb_dns_name" {
-  value = aws_lb.app_alb.dns_name
-}
-
 output "app_url" {
-  value = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 ? "https://${var.domain_name}" : "http://${aws_lb.app_alb.dns_name}"
+  value = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 ? "https://${var.domain_name}" : (var.enable_cloudfront ? "https://${aws_cloudfront_distribution.cdn[0].domain_name}" : "http://${aws_lb.app_alb.dns_name}")
 }

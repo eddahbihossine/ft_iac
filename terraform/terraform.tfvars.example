@@ -13,3 +13,7 @@ ssh_private_key_path = "~/.ssh/id_ed25519"
 # domain_name    = "app.example.com"
 
 enable_cloudfront = false
+
+# Optional resource name overrides (useful if your account already has similarly named ALB/TG resources)
+# alb_name          = "dev-alb-iac"
+# target_group_name = "dev-tg-iac"

@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terraform Learning Map</title>
+  <style>
+    :root {
+      --bg: #f5f4ef;
+      --card: #fffdf8;
+      --ink: #1f2937;
+      --muted: #5b6472;
+      --accent: #0f766e;
+      --accent-soft: #d2f2ee;
+      --line: #d8dce3;
+      --warn: #92400e;
+      --warn-soft: #ffedd5;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "Segoe UI", "Trebuchet MS", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 10% 10%, #fef3c7 0, transparent 30%),
+        radial-gradient(circle at 90% 90%, #dbeafe 0, transparent 30%),
+        var(--bg);
+      line-height: 1.5;
+    }
+
+    .wrap {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 28px 18px 40px;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(1.6rem, 3vw, 2.4rem);
+      letter-spacing: 0.2px;
+    }
+
+    .subtitle {
+      margin: 0 0 24px;
+      color: var(--muted);
+      max-width: 760px;
+    }
+
+    .note {
+      background: var(--warn-soft);
+      color: var(--warn);
+      border: 1px solid #f4c99b;
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 18px;
+      font-size: 0.95rem;
+    }
+
+    .section {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: 0 6px 18px rgba(17, 24, 39, 0.05);
+    }
+
+    .section h2 {
+      margin: 2px 0 10px;
+      font-size: 1.15rem;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 10px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 42px 1fr;
+      gap: 10px;
+      align-items: start;
+      padding: 10px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #ffffff;
+    }
+
+    .num {
+      width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      color: #ffffff;
+      background: var(--accent);
+      margin-top: 1px;
+    }
+
+    .step h3 {
+      margin: 0 0 2px;
+      font-size: 1rem;
+    }
+
+    .step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    details {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #ffffff;
+      margin: 8px 0;
+    }
+
+    summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: #0f172a;
+    }
+
+    .chip {
+      display: inline-block;
+      font-family: "Courier New", monospace;
+      font-size: 0.83rem;
+      background: var(--accent-soft);
+      color: #065f58;
+      border: 1px solid #9fe2d8;
+      border-radius: 999px;
+      padding: 3px 8px;
+      margin-right: 5px;
+      margin-top: 5px;
+    }
+
+    .footer {
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .line-list {
+      margin: 8px 0 0;
+      padding-left: 20px;
+    }
+
+    .line-list li {
+      margin-bottom: 6px;
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    .line-list code {
+      color: #0b3b36;
+      font-weight: 600;
+    }
+
+    @media (max-width: 640px) {
+      .wrap { padding: 18px 12px 24px; }
+      .step { grid-template-columns: 36px 1fr; }
+      .num { width: 28px; height: 28px; font-size: 0.88rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>Terraform Learning Map</h1>
+    <p class="subtitle">
+      This page explains your Terraform project in the exact order Terraform thinks.
+      Learn it like a story: what gets loaded first, what depends on what, and what appears in AWS at the end.
+    </p>
+
+    <div class="note">
+      Terraform does not run files top-to-bottom. It reads all <code>.tf</code> files together, builds a dependency graph, then executes resources in dependency order.
+    </div>
+
+    <section class="section">
+      <h2>1) What Happens First to Last</h2>
+      <div class="timeline">
+        <article class="step">
+          <div class="num">1</div>
+          <div>
+            <h3>Load and Parse Configuration</h3>
+            <p>Terraform reads every file in <code>terraform/</code> and merges them into one configuration.</p>
+          </div>
+        </article>
+
+        <article class="step">
+          <div class="num">2</div>
+          <div>
+            <h3>Check Inputs and Rules</h3>
+            <p>Variables from <code>terraform.tfvars</code> are loaded, then the <code>check "tls_dns_inputs"</code> rule validates DNS/TLS input consistency.</p>
+          </div>
+        </article>
+
+        <article class="step">
+          <div class="num">3</div>
+          <div>
+            <h3>Initialize Providers</h3>
+            <p>Providers from <code>providers.tf</code> are prepared: AWS main region and AWS us-east-1 alias for CloudFront certificates.</p>
+          </div>
+        </article>
+
+        <article class="step">
+          <div class="num">4</div>
+          <div>
+            <h3>Build Dependency Graph</h3>
+            <p>Terraform detects links like <code>aws_subnet.public</code> depends on <code>aws_vpc.main</code>, and listeners depend on ALB.</p>
+          </div>
+        </article>
+
+        <article class="step">
+          <div class="num">5</div>
+          <div>
+            <h3>Plan</h3>
+            <p>Terraform compares current state and AWS real resources, then prints create/update/destroy actions.</p>
+          </div>
+        </article>
+
+        <article class="step">
+          <div class="num">6</div>
+          <div>
+            <h3>Apply in Order</h3>
+            <p>Foundations first (VPC, subnets, security groups), then compute/ALB, then optional DNS/TLS/CloudFront, then outputs.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>2) Project File Roles</h2>
+
+      <details open>
+        <summary><code>variables.tf</code> - input knobs and guardrails</summary>
+        <p>Defines values you can change: region, subnet ranges, SSH key paths, domain settings, CloudFront toggle, and naming overrides.</p>
+        <span class="chip">inputs</span>
+        <span class="chip">validation</span>
+      </details>
+
+      <details open>
+        <summary><code>providers.tf</code> - AWS login + EC2 + app deploy</summary>
+        <p>Declares providers, IAM role/profile, key pair, security groups, EC2 instance, then copies app files and runs Docker deploy commands via SSH.</p>
+        <span class="chip">provider</span>
+        <span class="chip">ec2</span>
+        <span class="chip">provisioner</span>
+      </details>
+
+      <details>
+        <summary><code>vpc.tf</code> - network foundation</summary>
+        <p>Creates VPC, internet gateway, public subnets, route table, and associations.</p>
+        <span class="chip">network</span>
+      </details>
+
+      <details>
+        <summary><code>alb.tf</code> - traffic entry point</summary>
+        <p>Creates ALB, target group, listeners, and attaches EC2 to receive app traffic.</p>
+        <span class="chip">load-balancer</span>
+      </details>
+
+      <details>
+        <summary><code>acm_and_dns.tf</code> - ALB certificate and Route53 alias</summary>
+        <p>When domain+zone are provided (and CloudFront is off), it requests ACM cert, validates DNS, and creates Route53 A record.</p>
+        <span class="chip">tls</span>
+        <span class="chip">dns</span>
+      </details>
+
+      <details>
+        <summary><code>cloudfront.tf</code> - optional CDN and HTTPS edge</summary>
+        <p>If enabled, creates CloudFront in front of ALB. Uses default CloudFront certificate without a custom domain, or us-east-1 ACM cert with domain.</p>
+        <span class="chip">cdn</span>
+        <span class="chip">https</span>
+      </details>
+
+      <details>
+        <summary><code>outputs.tf</code> - final values shown to you</summary>
+        <p>Prints ALB DNS/ARN, route53 record, certificate ARN, and final HTTPS endpoint.</p>
+        <span class="chip">result</span>
+      </details>
+    </section>
+
+    <section class="section">
+      <h2>3) Line-by-Line Compile Map (Exact File Ranges)</h2>
+
+      <details open>
+        <summary><code>providers.tf</code> (main engine)</summary>
+        <ul class="line-list">
+          <li><code>1-13</code>: Terraform + provider requirements are read first so Terraform knows what plugins are needed.</li>
+          <li><code>15-29</code>: <code>locals.app_deploy_hash</code> is computed from app files; this decides if deploy steps should re-run.</li>
+          <li><code>31-35</code>: Primary AWS provider config (region/profile).</li>
+          <li><code>38-43</code>: Secondary provider alias in <code>us-east-1</code> for CloudFront-related ACM certificates.</li>
+          <li><code>45-65</code>: IAM role, policy attachment, and instance profile (permissions for EC2/SSM).</li>
+          <li><code>67-70</code>: EC2 key pair from your local SSH public key.</li>
+          <li><code>72-144</code>: Security groups (ALB and EC2 firewall rules).</li>
+          <li><code>146-185</code>: EC2 instance creation + startup script (Docker install, compose install, swap setup).</li>
+          <li><code>187-270</code>: Post-instance deploy actions: SSH, copy files, run docker compose, health check.</li>
+          <li><code>272-274</code>: EC2 public IP output.</li>
+        </ul>
+      </details>
+
+      <details>
+        <summary><code>variables.tf</code> (inputs Terraform loads before graph)</summary>
+        <ul class="line-list">
+          <li><code>1-67</code>: Declares all configurable inputs: region, ssh paths, network ranges, domain values.</li>
+          <li><code>69-80</code>: Safety check: domain and hosted zone must be both empty or both filled.</li>
+          <li><code>82-98</code>: Optional toggles/names (<code>enable_cloudfront</code>, ALB and TG custom names).</li>
+        </ul>
+      </details>
+
+      <details>
+        <summary><code>vpc.tf</code> (network base; almost everything depends on this)</summary>
+        <ul class="line-list">
+          <li><code>1-8</code>: VPC creation.</li>
+          <li><code>10-13</code>: Internet gateway attached to VPC.</li>
+          <li><code>15-24</code>: Public subnets across AZs.</li>
+          <li><code>26</code>: Reads available AZs data source.</li>
+          <li><code>28-41</code>: Public route table and subnet associations.</li>
+          <li><code>43-49</code>: Network outputs.</li>
+        </ul>
+      </details>
+
+      <details>
+        <summary><code>alb.tf</code> (traffic control)</summary>
+        <ul class="line-list">
+          <li><code>1-8</code>: ALB resource.</li>
+          <li><code>10-25</code>: Target group + health check path <code>/health/liveness</code>.</li>
+          <li><code>27-36</code>: HTTP listener (only when redirect mode is not used).</li>
+          <li><code>38-53</code>: HTTP to HTTPS redirect listener when custom domain mode is active.</li>
+          <li><code>55-67</code>: HTTPS listener with ACM certificate for ALB mode.</li>
+          <li><code>69-73</code>: Attach EC2 instance to target group.</li>
+          <li><code>75-77</code>: Final app URL output logic.</li>
+        </ul>
+      </details>
+
+      <details>
+        <summary><code>acm_and_dns.tf</code> (ALB TLS + Route53)</summary>
+        <ul class="line-list">
+          <li><code>1-9</code>: ACM cert for ALB path (disabled when CloudFront mode is on).</li>
+          <li><code>11-18</code>: DNS validation records for cert.</li>
+          <li><code>20-24</code>: Certificate validation completion resource.</li>
+          <li><code>26-36</code>: Route53 alias A record to ALB or CloudFront depending on mode.</li>
+        </ul>
+      </details>
+
+      <details>
+        <summary><code>cloudfront.tf</code> (optional CDN + HTTPS edge)</summary>
+        <ul class="line-list">
+          <li><code>1-28</code>: Optional us-east-1 cert + DNS validation for custom domain CloudFront.</li>
+          <li><code>30-79</code>: CloudFront distribution itself (origin ALB, cache behavior, TLS settings).</li>
+          <li><code>81-83</code>: CloudFront domain output.</li>
+        </ul>
+      </details>
+
+      <details>
+        <summary><code>outputs.tf</code> (final exported values)</summary>
+        <ul class="line-list">
+          <li><code>1-7</code>: ALB DNS and ARN.</li>
+          <li><code>9-11</code>: Route53 record fqdn if created.</li>
+          <li><code>13-15</code>: Certificate ARN selected by mode.</li>
+          <li><code>17-19</code>: HTTPS endpoint selected by mode.</li>
+        </ul>
+      </details>
+    </section>
+
+    <section class="section">
+      <h2>4) Real Execution Order in This Stack</h2>
+      <p>Simple dependency chain (happy path):</p>
+      <p>
+        Variables -> Providers -> VPC/IGW/Subnets -> Security Groups -> IAM + KeyPair -> EC2 ->
+        Target Group -> ALB -> Listener(s) -> Optional ACM/DNS/CloudFront -> Outputs
+      </p>
+    </section>
+
+    <section class="section">
+      <h2>5) How to Read Plan Like a Pro</h2>
+      <p><strong>+ create</strong>: Terraform will make something new.</p>
+      <p><strong>~ update</strong>: Terraform will change an existing resource.</p>
+      <p><strong>- destroy</strong>: Terraform will remove a resource.</p>
+      <p><strong>-/+</strong>: Terraform must replace the resource (destroy then recreate).</p>
+    </section>
+
+    <p class="footer">
+      Tip: each time you edit variables, run <code>terraform plan</code> first and read this page while matching each resource to its file.
+    </p>
+  </main>
+</body>
+</html>

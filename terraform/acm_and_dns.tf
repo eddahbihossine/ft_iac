@@ -1,5 +1,5 @@
 resource "aws_acm_certificate" "site_cert" {
-  count             = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 ? 1 : 0
+  count             = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 && !var.enable_cloudfront ? 1 : 0
   domain_name       = var.domain_name
   validation_method = "DNS"
   lifecycle {
@@ -29,8 +29,8 @@ resource "aws_route53_record" "site_record" {
   name    = var.domain_name
   type    = "A"
   alias {
-    name                   = aws_lb.app_alb.dns_name
-    zone_id                = aws_lb.app_alb.zone_id
+    name                   = var.enable_cloudfront ? aws_cloudfront_distribution.cdn[0].domain_name : aws_lb.app_alb.dns_name
+    zone_id                = var.enable_cloudfront ? aws_cloudfront_distribution.cdn[0].hosted_zone_id : aws_lb.app_alb.zone_id
     evaluate_target_health = true
   }
 }
