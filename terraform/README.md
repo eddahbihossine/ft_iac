@@ -36,6 +36,7 @@ Security and secrets
 - SSH is disabled by default. Single-EC2 mode uses Terraform provisioners (SSH), so either set `ssh_ingress_cidr` to your public IP (a `/32`) or leave it empty and Terraform will auto-detect your current public IP and allow SSH from it.
 - The single-EC2 mode no longer relies on a committed `.env.local`. If you do not provide `TF_VAR_mysql_root_password` / `TF_VAR_mysql_password`, strong passwords are generated on the EC2 instance and persisted there.
 - The managed DB uses an AWS-managed master password (stored in Secrets Manager), so you do not need to put DB passwords in tfvars.
+- Treat Terraform state as sensitive: do not commit `terraform.tfstate*`, `tfplan`, generated app zips, or local SSH private keys to git. Prefer SSM Session Manager for access in HA mode.
 
 Cost profiles
 - `cost_profile = "free"` (default): strict free-trial mode.

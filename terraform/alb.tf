@@ -74,11 +74,3 @@ resource "aws_lb_listener" "https" {
     target_group_arn = aws_lb_target_group.app_tg[0].arn
   }
 }
-
-output "app_url" {
-  value = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 ? "https://${var.domain_name}" : (
-    length(aws_cloudfront_distribution.cdn) > 0 ? "https://${aws_cloudfront_distribution.cdn[0].domain_name}" : (
-      var.enable_alb ? "http://${aws_lb.app_alb[0].dns_name}" : "http://${aws_instance.example[0].public_ip}:${var.app_public_port}"
-    )
-  )
-}

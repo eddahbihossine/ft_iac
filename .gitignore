@@ -7,6 +7,7 @@ logs/
 playwright-report/
 test-results/
 node_modules/
+.venv/
 
 # Terraform
 .terraform/
@@ -14,8 +15,12 @@ node_modules/
 *.tfstate.backup
 *.tfplan
 *.tfvars
+terraform/terraform.tfstate.d/
+terraform/.deploy/
 terraform/*.auto.tfvars.json
 terraform/config.auto.tfvars.json
+terraform/tfplan
+terraform/app-*.zip
 crash.log
 override.tf
 override.tf.json
@@ -27,6 +32,10 @@ terraform/hossine
 terraform/*.key
 terraform/*.pem
 terraform/*.pub
+
+# Root-level local SSH keys (do not commit)
+/hossine
+/hossine.pub
 
 # Local AWS credentials/config for Terraform
 terraform/.aws/

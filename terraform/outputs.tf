@@ -6,6 +6,14 @@ output "alb_arn" {
   value = var.enable_alb ? aws_lb.app_alb[0].arn : ""
 }
 
+output "target_group_arn" {
+  value = var.enable_alb ? aws_lb_target_group.app_tg[0].arn : ""
+}
+
+output "asg_name" {
+  value = var.enable_alb ? aws_autoscaling_group.app[0].name : ""
+}
+
 output "route53_record" {
   value = length(aws_route53_record.site_record) > 0 ? aws_route53_record.site_record[0].fqdn : ""
 }

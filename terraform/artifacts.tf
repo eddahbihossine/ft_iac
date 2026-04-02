@@ -15,6 +15,13 @@ data "archive_file" "app_zip" {
 
   excludes = [
     ".git",
+    ".gitignore",
+    ".nvmrc",
+    ".venv",
+    "hossine",
+    "hossine.pub",
+    "*.pem",
+    "*.key",
     "node_modules",
     "dist",
     "coverage",

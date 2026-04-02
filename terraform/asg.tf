@@ -49,6 +49,23 @@ resource "aws_launch_template" "app" {
 
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
 
+  block_device_mappings {
+    device_name = "/dev/xvda"
+
+    ebs {
+      volume_size           = local.selected_server_root_volume_gb
+      volume_type           = "gp3"
+      encrypted             = true
+      delete_on_termination = true
+    }
+  }
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+  }
+
   user_data = base64encode(<<-EOF
     #!/bin/bash
     set -euxo pipefail
@@ -99,6 +116,7 @@ resource "aws_launch_template" "app" {
       exit 1
     fi
 
+    install -m 600 -o root -g root /dev/null /opt/app/.env.runtime
     cat > /opt/app/.env.runtime <<ENV
     MYSQL_HOST=$MYSQL_HOST
     MYSQL_PORT=$MYSQL_PORT
@@ -212,8 +230,6 @@ resource "aws_autoscaling_group" "app" {
       min_healthy_percentage = 50
       instance_warmup        = 240
     }
-
-    triggers = ["launch_template"]
   }
 
   tag {

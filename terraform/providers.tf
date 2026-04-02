@@ -66,7 +66,12 @@ data "external" "runner_public_ip" {
 }
 
 resource "aws_iam_role" "ssm_role" {
-  name = "${var.environment}-ssm-role"
+  name = "${var.environment}-ssm-role-${local.selected_region}"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -83,7 +88,12 @@ resource "aws_iam_role_policy_attachment" "ssm_policy" {
 }
 
 resource "aws_iam_instance_profile" "ssm_profile" {
-  name = "${var.environment}-ssm-profile"
+  name = "${var.environment}-ssm-profile-${local.selected_region}"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
   role = aws_iam_role.ssm_role.name
 }
 
@@ -114,7 +124,7 @@ resource "aws_security_group" "ec2_sg" {
     from_port   = -1
     to_port     = -1
     protocol    = "icmp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = [var.vpc_cidr]
   }
 
   dynamic "ingress" {
@@ -194,8 +204,16 @@ resource "aws_instance" "example" {
   associate_public_ip_address = true
 
   root_block_device {
-    volume_size = local.selected_server_root_volume_gb
-    volume_type = "gp3"
+    volume_size           = local.selected_server_root_volume_gb
+    volume_type           = "gp3"
+    encrypted             = true
+    delete_on_termination = true
+  }
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
   }
 
   user_data = <<-EOF

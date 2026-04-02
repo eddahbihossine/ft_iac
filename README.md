@@ -11,6 +11,19 @@ $ corepack enable
 $ pnpm install --frozen-lockfile
 ```
 
+## Deploy (AWS + Terraform)
+
+This repo includes an interactive deploy CLI that:
+- lets you choose a region,
+- generates an SSH keypair under `~/.ssh/` (no repo secrets),
+- writes `terraform/terraform.tfvars` (gitignored),
+- runs `terraform init/plan/apply`.
+
+Run:
+```bash
+pnpm deploy
+```
+
 ## Running the app
 
 ### Development environment
@@ -98,7 +111,7 @@ pnpm test:e2e:ui
 
 ## Tooling
 
-- Node.js 18 is the expected runtime. Use the `.nvmrc` file or your version manager of choice to match it.
+- Node.js 18 is the expected runtime. Use your version manager of choice to match it.
 
 
 ## Stack
