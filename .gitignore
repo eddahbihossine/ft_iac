@@ -14,6 +14,8 @@ node_modules/
 *.tfstate.backup
 *.tfplan
 *.tfvars
+terraform/*.auto.tfvars.json
+terraform/config.auto.tfvars.json
 crash.log
 override.tf
 override.tf.json

@@ -1,9 +1,9 @@
 output "alb_dns" {
-  value = aws_lb.app_alb.dns_name
+  value = var.enable_alb ? aws_lb.app_alb[0].dns_name : ""
 }
 
 output "alb_arn" {
-  value = aws_lb.app_alb.arn
+  value = var.enable_alb ? aws_lb.app_alb[0].arn : ""
 }
 
 output "route53_record" {
@@ -15,5 +15,30 @@ output "certificate_arn" {
 }
 
 output "https_endpoint" {
-  value = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 ? "https://${var.domain_name}" : (var.enable_cloudfront ? "https://${aws_cloudfront_distribution.cdn[0].domain_name}" : "")
+  value = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 ? "https://${var.domain_name}" : (length(aws_cloudfront_distribution.cdn) > 0 ? "https://${aws_cloudfront_distribution.cdn[0].domain_name}" : "")
+}
+
+output "app_endpoint" {
+  value = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 ? "https://${var.domain_name}" : (
+    length(aws_cloudfront_distribution.cdn) > 0 ? "https://${aws_cloudfront_distribution.cdn[0].domain_name}" : (
+      var.enable_alb ? "http://${aws_lb.app_alb[0].dns_name}" : "http://${aws_instance.example[0].public_ip}:${var.app_public_port}"
+    )
+  )
+}
+
+output "selected_region" {
+  value = local.selected_region
+}
+
+output "selected_server_instance_type" {
+  value = local.selected_server_instance_type
+}
+
+output "db_endpoint" {
+  value = var.enable_database ? aws_db_instance.mysql[0].address : ""
+}
+
+output "db_master_secret_arn" {
+  value     = var.enable_database ? aws_db_instance.mysql[0].master_user_secret[0].secret_arn : ""
+  sensitive = true
 }

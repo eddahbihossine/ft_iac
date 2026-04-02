@@ -1,0 +1,37 @@
+{
+  "environment": "dev",
+
+  "cost_profile": "free",
+
+  "region_choice": "Paris",
+  "server_size": "small",
+
+  "ssh_key_name": "terraform-deployer",
+  "ssh_public_key_path": "~/.ssh/id_ed25519.pub",
+  "ssh_private_key_path": "~/.ssh/id_ed25519",
+
+  "ssh_ingress_cidr": "",
+  "public_app_ingress_cidr": "0.0.0.0/0",
+
+  "enable_alb": false,
+  "enable_cloudfront": false,
+
+  "alert_email": "",
+
+  "enable_database": false,
+  "db_size": "small",
+  "db_name": "app",
+  "db_username": "app",
+  "db_password": "",
+
+  "db_multi_az": false,
+
+  "asg_min_size": 2,
+  "asg_desired_capacity": 2,
+  "asg_max_size": 4,
+
+  "mysql_user": "user",
+  "mysql_database": "todo_app",
+  "mysql_root_password": "",
+  "mysql_password": ""
+}

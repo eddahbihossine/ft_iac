@@ -1,43 +1,52 @@
 resource "aws_lb" "app_alb" {
+  count              = var.enable_alb ? 1 : 0
   name               = length(var.alb_name) > 0 ? var.alb_name : "${var.environment}-alb-iac"
   internal           = false
   load_balancer_type = "application"
   subnets            = [for s in aws_subnet.public : s.id]
-  security_groups    = [aws_security_group.alb_sg.id]
+  security_groups    = [aws_security_group.alb_sg[0].id]
   tags               = { Name = "${var.environment}-alb" }
 }
 
 resource "aws_lb_target_group" "app_tg" {
+  count    = var.enable_alb ? 1 : 0
   name     = length(var.target_group_name) > 0 ? var.target_group_name : "${var.environment}-tg-iac"
-  port     = 3000
+  port     = var.app_public_port
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id
+
+  stickiness {
+    enabled         = true
+    type            = "lb_cookie"
+    cookie_duration = 3600
+  }
+
   health_check {
-    path                = "/health/liveness"
+    path                = var.app_health_path
     protocol            = "HTTP"
-    port                = "3000"
+    port                = tostring(var.app_public_port)
     matcher             = "200"
     interval            = 30
-    timeout             = 5
+    timeout             = 10
     healthy_threshold   = 2
-    unhealthy_threshold = 2
+    unhealthy_threshold = 3
   }
 }
 
 resource "aws_lb_listener" "http" {
-  count             = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 && !var.enable_cloudfront ? 0 : 1
-  load_balancer_arn = aws_lb.app_alb.arn
+  count             = var.enable_alb ? (length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 && !var.enable_cloudfront ? 0 : 1) : 0
+  load_balancer_arn = aws_lb.app_alb[0].arn
   port              = "80"
   protocol          = "HTTP"
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.app_tg.arn
+    target_group_arn = aws_lb_target_group.app_tg[0].arn
   }
 }
 
 resource "aws_lb_listener" "http_redirect" {
-  count             = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 && !var.enable_cloudfront ? 1 : 0
-  load_balancer_arn = aws_lb.app_alb.arn
+  count             = var.enable_alb ? (length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 && !var.enable_cloudfront ? 1 : 0) : 0
+  load_balancer_arn = aws_lb.app_alb[0].arn
   port              = "80"
   protocol          = "HTTP"
 
@@ -53,8 +62,8 @@ resource "aws_lb_listener" "http_redirect" {
 }
 
 resource "aws_lb_listener" "https" {
-  count             = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 && !var.enable_cloudfront ? 1 : 0
-  load_balancer_arn = aws_lb.app_alb.arn
+  count             = var.enable_alb ? (length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 && !var.enable_cloudfront ? 1 : 0) : 0
+  load_balancer_arn = aws_lb.app_alb[0].arn
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-TLS13-1-2-2021-06"
@@ -62,16 +71,14 @@ resource "aws_lb_listener" "https" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.app_tg.arn
+    target_group_arn = aws_lb_target_group.app_tg[0].arn
   }
 }
 
-resource "aws_lb_target_group_attachment" "ec2_attach" {
-  target_group_arn = aws_lb_target_group.app_tg.arn
-  target_id        = aws_instance.example.id
-  port             = 3000
-}
-
 output "app_url" {
-  value = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 ? "https://${var.domain_name}" : (var.enable_cloudfront ? "https://${aws_cloudfront_distribution.cdn[0].domain_name}" : "http://${aws_lb.app_alb.dns_name}")
+  value = length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 ? "https://${var.domain_name}" : (
+    length(aws_cloudfront_distribution.cdn) > 0 ? "https://${aws_cloudfront_distribution.cdn[0].domain_name}" : (
+      var.enable_alb ? "http://${aws_lb.app_alb[0].dns_name}" : "http://${aws_instance.example[0].public_ip}:${var.app_public_port}"
+    )
+  )
 }

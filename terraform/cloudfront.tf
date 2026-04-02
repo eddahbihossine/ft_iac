@@ -1,6 +1,6 @@
 resource "aws_acm_certificate" "cloudfront_cert" {
   provider          = aws.us_east_1
-  count             = var.enable_cloudfront && length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 ? 1 : 0
+  count             = var.enable_cloudfront && var.enable_alb && length(var.domain_name) > 0 && length(var.hosted_zone_id) > 0 ? 1 : 0
   domain_name       = var.domain_name
   validation_method = "DNS"
 
@@ -28,7 +28,7 @@ resource "aws_acm_certificate_validation" "cloudfront_cert_validation" {
 }
 
 resource "aws_cloudfront_distribution" "cdn" {
-  count           = var.enable_cloudfront ? 1 : 0
+  count           = var.enable_cloudfront && var.enable_alb ? 1 : 0
   enabled         = true
   is_ipv6_enabled = true
   comment         = "CDN for ${var.domain_name}"
@@ -36,7 +36,7 @@ resource "aws_cloudfront_distribution" "cdn" {
   aliases = length(var.domain_name) > 0 ? [var.domain_name] : []
 
   origin {
-    domain_name = aws_lb.app_alb.dns_name
+    domain_name = aws_lb.app_alb[0].dns_name
     origin_id   = "alb-origin"
     custom_origin_config {
       http_port              = 80
@@ -80,5 +80,5 @@ resource "aws_cloudfront_distribution" "cdn" {
 }
 
 output "cloudfront_domain" {
-  value = var.enable_cloudfront ? aws_cloudfront_distribution.cdn[0].domain_name : ""
+  value = length(aws_cloudfront_distribution.cdn) > 0 ? aws_cloudfront_distribution.cdn[0].domain_name : ""
 }

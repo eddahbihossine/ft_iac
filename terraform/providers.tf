@@ -5,6 +5,14 @@ terraform {
       source  = "hashicorp/aws"
       version = ">= 4.0"
     }
+    archive = {
+      source  = "hashicorp/archive"
+      version = ">= 2.4"
+    }
+    external = {
+      source  = "hashicorp/external"
+      version = ">= 2.3"
+    }
     null = {
       source  = "hashicorp/null"
       version = ">= 3.0"
@@ -17,7 +25,6 @@ locals {
     [
       filesha256("${path.module}/../docker-compose.yml"),
       filesha256("${path.module}/../dockerfile"),
-      filesha256("${path.module}/../.env.local"),
       filesha256("${path.module}/../package.json"),
       filesha256("${path.module}/../pnpm-lock.yaml"),
       filesha256("${path.module}/../tsconfig.json"),
@@ -26,10 +33,16 @@ locals {
     ],
     [for file in sort(fileset("${path.module}/../src", "**")) : filesha256("${path.module}/../src/${file}")]
   )))
+
+  # Single-EC2 mode uses Terraform provisioners (SSH). If ssh_ingress_cidr is not set,
+  # fall back to the public IP of the machine running Terraform.
+  ssh_ingress_cidr_effective = length(trimspace(var.ssh_ingress_cidr)) > 0 ? var.ssh_ingress_cidr : (
+    var.enable_alb ? "" : try("${data.external.runner_public_ip[0].result.ip}/32", "")
+  )
 }
 
 provider "aws" {
-  region                  = var.aws_region
+  region                  = local.selected_region
   profile                 = var.aws_profile
   skip_metadata_api_check = true
 }
@@ -40,6 +53,16 @@ provider "aws" {
   region                  = "us-east-1"
   profile                 = var.aws_profile
   skip_metadata_api_check = true
+}
+
+data "external" "runner_public_ip" {
+  count = var.enable_alb ? 0 : (length(trimspace(var.ssh_ingress_cidr)) > 0 ? 0 : 1)
+
+  program = [
+    "bash",
+    "-lc",
+    "ip=$(curl -s https://checkip.amazonaws.com | tr -d '[:space:]'); printf '{\"ip\":\"%s\"}' \"$ip\"",
+  ]
 }
 
 resource "aws_iam_role" "ssm_role" {
@@ -74,13 +97,15 @@ resource "aws_security_group" "ec2_sg" {
   description = "Allow SSH, ICMP, and HTTP from ALB"
   vpc_id      = aws_vpc.main.id
 
-  # SSH
-  ingress {
-    description = "SSH"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+  dynamic "ingress" {
+    for_each = length(trimspace(local.ssh_ingress_cidr_effective)) > 0 ? [1] : []
+    content {
+      description = "SSH"
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = [local.ssh_ingress_cidr_effective]
+    }
   }
 
   # ICMP (ping)
@@ -92,13 +117,26 @@ resource "aws_security_group" "ec2_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # HTTP from ALB (app listens on 3000)
-  ingress {
-    description     = "App port from ALB"
-    from_port       = 3000
-    to_port         = 3000
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
+  dynamic "ingress" {
+    for_each = var.enable_alb ? [1] : []
+    content {
+      description     = "App port from ALB"
+      from_port       = var.app_public_port
+      to_port         = var.app_public_port
+      protocol        = "tcp"
+      security_groups = [aws_security_group.alb_sg[0].id]
+    }
+  }
+
+  dynamic "ingress" {
+    for_each = var.enable_alb ? [] : [1]
+    content {
+      description = "App port (direct)"
+      from_port   = var.app_public_port
+      to_port     = var.app_public_port
+      protocol    = "tcp"
+      cidr_blocks = [var.public_app_ingress_cidr]
+    }
   }
 
   # All outbound
@@ -113,6 +151,7 @@ resource "aws_security_group" "ec2_sg" {
 }
 
 resource "aws_security_group" "alb_sg" {
+  count       = var.enable_alb ? 1 : 0
   name        = "${var.environment}-alb-sg"
   description = "Allow HTTP inbound to ALB"
   vpc_id      = aws_vpc.main.id
@@ -144,13 +183,20 @@ resource "aws_security_group" "alb_sg" {
 }
 
 resource "aws_instance" "example" {
-  ami                         = "ami-05d43d5e94bb6eb95"
-  instance_type               = "t3.micro"
+  count = var.enable_alb ? 0 : 1
+
+  ami                         = data.aws_ami.amazon_linux.id
+  instance_type               = local.selected_server_instance_type
   iam_instance_profile        = aws_iam_instance_profile.ssm_profile.name
   key_name                    = aws_key_pair.deployer.key_name
   subnet_id                   = aws_subnet.public["0"].id
   vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
   associate_public_ip_address = true
+
+  root_block_device {
+    volume_size = local.selected_server_root_volume_gb
+    volume_type = "gp3"
+  }
 
   user_data = <<-EOF
     #!/bin/bash
@@ -164,14 +210,14 @@ resource "aws_instance" "example" {
     systemctl enable docker
 
     # Install Docker Compose
-    DOCKER_COMPOSE_VERSION="v2.29.1"
+    DOCKER_COMPOSE_VERSION="${var.docker_compose_version}"
     curl -SL "https://github.com/docker/compose/releases/download/$${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64" \
       -o /usr/local/bin/docker-compose
     chmod +x /usr/local/bin/docker-compose
     ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
 
     # Add swap so Docker builds are less likely to stall on small instances.
-    fallocate -l 1G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=1024
+    fallocate -l ${var.swap_size_gb}G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=$(( ${var.swap_size_gb} * 1024 ))
     chmod 600 /swapfile
     mkswap /swapfile
     swapon /swapfile
@@ -185,10 +231,11 @@ resource "aws_instance" "example" {
 }
 
 resource "null_resource" "app_deploy" {
+  count      = var.enable_alb ? 0 : 1
   depends_on = [aws_instance.example]
 
   triggers = {
-    instance_id = aws_instance.example.id
+    instance_id = aws_instance.example[0].id
     app_hash    = local.app_deploy_hash
   }
 
@@ -196,7 +243,7 @@ resource "null_resource" "app_deploy" {
     type        = "ssh"
     user        = "ec2-user"
     private_key = file(pathexpand(var.ssh_private_key_path))
-    host        = aws_instance.example.public_ip
+    host        = aws_instance.example[0].public_ip
     timeout     = "5m"
   }
 
@@ -217,9 +264,69 @@ resource "null_resource" "app_deploy" {
     destination = "/home/ec2-user/app/dockerfile"
   }
 
-  provisioner "file" {
-    source      = "${path.module}/../.env.local"
-    destination = "/home/ec2-user/app/.env.local"
+  provisioner "remote-exec" {
+    inline = [
+      <<-EOC
+      set -eu
+
+      APP_DIR="/home/ec2-user/app"
+      ENV_FILE="$APP_DIR/.env.local"
+
+      MYSQL_ROOT_PASSWORD_INPUT='${var.mysql_root_password}'
+      MYSQL_PASSWORD_INPUT='${var.mysql_password}'
+
+      ensure_rand() {
+        tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32
+      }
+
+      # If secrets are provided via TF_VAR_*, prefer them.
+      # Otherwise, generate once on the instance and reuse across re-applies.
+      if [ -n "$MYSQL_ROOT_PASSWORD_INPUT" ] || [ -n "$MYSQL_PASSWORD_INPUT" ]; then
+        MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD_INPUT"
+        MYSQL_PASSWORD="$MYSQL_PASSWORD_INPUT"
+
+        if [ -z "$MYSQL_ROOT_PASSWORD" ]; then
+          MYSQL_ROOT_PASSWORD="$(ensure_rand)"
+        fi
+        if [ -z "$MYSQL_PASSWORD" ]; then
+          MYSQL_PASSWORD="$(ensure_rand)"
+        fi
+
+        cat > "$ENV_FILE" <<ENV
+MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
+MYSQL_DATABASE=${var.mysql_database}
+MYSQL_USER=${var.mysql_user}
+MYSQL_PASSWORD=$MYSQL_PASSWORD
+
+MYSQL_HOST=localhost
+MYSQL_PORT=${var.mysql_port}
+
+DB_INIT_SYNC=true
+ENV
+      else
+        if [ -f "$ENV_FILE" ]; then
+          echo "Reusing existing $ENV_FILE"
+        else
+          MYSQL_ROOT_PASSWORD="$(ensure_rand)"
+          MYSQL_PASSWORD="$(ensure_rand)"
+
+          cat > "$ENV_FILE" <<ENV
+MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
+MYSQL_DATABASE=${var.mysql_database}
+MYSQL_USER=${var.mysql_user}
+MYSQL_PASSWORD=$MYSQL_PASSWORD
+
+MYSQL_HOST=localhost
+MYSQL_PORT=${var.mysql_port}
+
+DB_INIT_SYNC=true
+ENV
+        fi
+      fi
+
+      chmod 600 "$ENV_FILE"
+      EOC
+    ]
   }
 
   provisioner "file" {
@@ -258,17 +365,18 @@ resource "null_resource" "app_deploy" {
       "while [ ! -f /home/ec2-user/.docker-ready ]; do sleep 2; done",
       "sleep 5",
       "cd /home/ec2-user/app",
+      "cp -f dockerfile Dockerfile",
       "sudo docker-compose --env-file .env.local up -d --build --force-recreate",
       "echo 'Waiting for services to start...'",
       "sleep 30",
       "echo '=== Container status ==='",
       "sudo docker ps",
       "echo '=== Health check ==='",
-      "curl -s -o /dev/null -w 'HTTP %%{http_code}' http://localhost:3000/health/liveness || echo 'App not ready yet (will be available shortly via ALB health checks)'",
+      "curl -s -o /dev/null -w 'HTTP %%{http_code}' http://localhost:${var.app_public_port}${var.app_health_path} || echo 'App not ready yet (will be available shortly via ALB health checks)'",
     ]
   }
 }
 
 output "ec2_public_ip" {
-  value = aws_instance.example.public_ip
+  value = var.enable_alb ? "" : aws_instance.example[0].public_ip
 }
