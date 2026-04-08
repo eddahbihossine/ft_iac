@@ -16,6 +16,16 @@ What this creates
 - Optional managed database (RDS MySQL) in private subnets when `enable_database = true`
 
 How to use
+0. Recommended (interactive): use the deploy CLI from the repo root
+    - Run `pnpm deploy`
+    - The script will:
+       - create/select a Terraform workspace named like `<environment>-<aws-region>` (example: `dev-eu-west-3`)
+       - write a matching tfvars file under `terraform/.deploy/<workspace>.tfvars` (gitignored)
+       - run `terraform init/validate/plan/apply`
+    - The script also includes a couple of “adopt into state and retry” paths for common AWS idempotency issues:
+       - EC2 keypair already exists (`InvalidKeyPair.Duplicate`) → imports the keypair into state and retries
+       - S3 artifacts bucket already exists (`BucketAlreadyOwnedByYou`) → imports/adopts it into state and retries
+
 1. Recommended: create a user config file (no code edits)
    - Copy `config.auto.tfvars.json.example` to `config.auto.tfvars.json`.
    - Edit only the values (region, sizes, alert email, DB settings, SSH key paths).
@@ -25,6 +35,18 @@ How to use
    terraform plan -out=tfplan
 3. Apply:
    terraform apply "tfplan"
+
+Get the app URL
+- After apply, you can read the outputs from the workspace state:
+   - `terraform output -raw app_endpoint`
+   - `terraform output -raw https_endpoint`
+   - `terraform output -raw alb_dns`
+
+Destroy
+- Destroy is per workspace (and typically per region):
+   - `terraform workspace list`
+   - `terraform workspace select dev-eu-west-3`
+   - `terraform destroy -auto-approve -var-file=.deploy/dev-eu-west-3.tfvars`
 
 Friendly selectors (root-level)
 - `region_choice`: choose a friendly name like `Paris` or `EU` instead of `eu-west-3`.

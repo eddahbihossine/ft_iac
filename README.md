@@ -13,15 +13,48 @@ $ pnpm install --frozen-lockfile
 
 ## Deploy (AWS + Terraform)
 
-This repo includes an interactive deploy CLI that:
+Architecture diagram (for evaluation): `docs/ARCHITECTURE_DIAGRAM.md`.
+
+This repo includes an interactive deploy CLI (`scripts/deploy.js`) that:
 - lets you choose a region,
-- generates an SSH keypair under `~/.ssh/` (no repo secrets),
-- writes `terraform/terraform.tfvars` (gitignored),
-- runs `terraform init/plan/apply`.
+- generates (or reuses) an SSH keypair under `~/.ssh/` (no repo secrets),
+- writes a per-environment/per-region tfvars file under `terraform/.deploy/` (gitignored),
+- uses a Terraform workspace per environment+region (example: `dev-eu-west-3`),
+- runs `terraform init/validate/plan/apply`.
+
+Notes:
+- `terraform apply` can take a while in `standard` mode (ALB/ASG/RDS). The deploy script streams Terraform output so you can see progress.
+- If an EC2 key pair already exists, the deploy script will auto-`terraform import` it and retry once.
+- If the artifacts bucket already exists, the deploy script will attempt to import/adopt it and retry once.
 
 Run:
 ```bash
 pnpm deploy
+# or: pnpm run deploy
+```
+
+### Get the app URL (console)
+
+After a successful apply, Terraform prints useful outputs at the end. You can also query them manually:
+
+```bash
+cd terraform
+terraform workspace list
+terraform workspace select dev-eu-west-3
+terraform output -raw app_endpoint
+```
+
+### Destroy (dev/prod)
+
+Destroy is per workspace. Example (Paris / `eu-west-3`):
+
+```bash
+cd terraform
+terraform workspace select dev-eu-west-3
+terraform destroy -auto-approve -var-file=.deploy/dev-eu-west-3.tfvars
+
+terraform workspace select prod-eu-west-3
+terraform destroy -auto-approve -var-file=.deploy/prod-eu-west-3.tfvars
 ```
 
 ## Running the app

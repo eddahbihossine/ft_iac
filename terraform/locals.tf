@@ -1,6 +1,4 @@
 locals {
-  # Friendly region names → AWS region identifiers.
-  # Add your own aliases here without touching the rest of the code.
   region_map = {
     EU        = "eu-west-3"
     Paris     = "eu-west-3"
@@ -20,7 +18,6 @@ locals {
   }
 
   server_root_volume_gb_by_size = {
-    # Amazon Linux 2023 AMIs commonly require >= 30GB root volume.
     small  = 30
     medium = 30
     large  = 50
@@ -29,7 +26,6 @@ locals {
   _server_instance_type_standard = length(trimspace(var.server_instance_type_override)) > 0 ? var.server_instance_type_override : local.server_instance_type_by_size[lower(trimspace(var.server_size))]
   _server_root_volume_standard   = local.server_root_volume_gb_by_size[lower(trimspace(var.server_size))]
 
-  # In free mode, keep the server at the smallest tier.
   selected_server_instance_type  = lower(trimspace(var.cost_profile)) == "free" ? "t3.micro" : local._server_instance_type_standard
   selected_server_root_volume_gb = lower(trimspace(var.cost_profile)) == "free" ? 30 : local._server_root_volume_standard
 
