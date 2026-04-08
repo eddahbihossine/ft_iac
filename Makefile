@@ -1,4 +1,4 @@
-.PHONY: help build up down restart logs logs-api logs-db logs-adminer clean rebuild shell-api shell-db ps health install test lint format tf-init tf-plan tf-apply tf-ssl-plan tf-ssl-apply
+.PHONY: help build up down restart logs logs-api logs-db logs-adminer clean rebuild shell-api shell-db ps health install check-deploy-tools deploy test lint format tf-init tf-plan tf-apply tf-ssl-plan tf-ssl-apply
 
 # Default target
 help: ## Show this help message
@@ -71,6 +71,9 @@ ps: ## Show status of all containers
 install: ## Install dependencies locally
 	pnpm install
 
+deploy: check-deploy-tools ## Run interactive Terraform deploy CLI
+	pnpm i && pnpm run deploy
+
 dev: ## Run development server locally
 	pnpm run start:dev
 
@@ -113,7 +116,7 @@ quick-restart: down up logs-api ## Stop, start, and show API logs
 
 full-reset: clean rebuild health ## Full cleanup and rebuild with health check
 
-# Terraform Operations
+
 TF_DIR ?= terraform
 
 tf-init: ## Initialize Terraform

@@ -8,6 +8,7 @@ playwright-report/
 test-results/
 node_modules/
 .venv/
+*.txt
 
 # Terraform
 .terraform/
