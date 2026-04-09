@@ -18,8 +18,9 @@ export class TodosController {
   async displayTodosByUserId(@Param('userId') userId: string, @Session() session: AppSessionBaseType, @Res() res: Response) {
     Logger.controller.verbose('Display todos page', { controller: TodosController });
 
-    if (session.user === undefined)
-      res.redirect('/login');
+    if (session.user === undefined) {
+      return res.redirect('/login');
+    }
 
     if (session.user.id !== +userId)
       throw new UnauthorizedException();
@@ -37,6 +38,10 @@ export class TodosController {
   @Post('/:userId')
   async createTodo(@Body() createTodoDto: Omit<CreateTodoDto, 'id' | 'completed'>, @Res() res: Response, @Param('userId') userId: string, @Session() session: AppSessionLoggedType) {
     Logger.controller.verbose('Create a new todo', { controller: TodosController });
+
+    if (!session.user) {
+      return res.redirect('/login');
+    }
 
     if (session.user.id !== +userId)
       throw new UnauthorizedException();

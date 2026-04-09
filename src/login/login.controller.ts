@@ -54,6 +54,14 @@ export class LoginController {
 
         session.user = user;
 
+        await new Promise<void>((resolve, reject) => {
+            // Ensure the session is persisted before redirecting.
+            (session as any).save((error: Error | null) => {
+                if (error) return reject(error);
+                return resolve();
+            });
+        });
+
         return res.redirect(`/todos/${user.id}`);
     }
 }

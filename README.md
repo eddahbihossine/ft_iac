@@ -44,7 +44,16 @@ terraform workspace select dev-eu-west-3
 terraform output -raw app_endpoint
 ```
 
-### Destroy (dev/prod)
+### Destroy (interactive)
+
+Use the interactive destroy CLI to remove everything provisioned by the deploy script for one workspace or all workspaces found in `terraform/.deploy`:
+
+```bash
+pnpm destroy
+# or: pnpm run destroy
+```
+
+### Destroy (manual dev/prod)
 
 Destroy is per workspace. Example (Paris / `eu-west-3`):
 

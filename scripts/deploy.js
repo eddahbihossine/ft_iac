@@ -153,33 +153,37 @@ function expandHome(filePath) {
   return filePath;
 }
 
-async function tryAdoptArtifactsBucket({ repoRoot, tfvarsPath, environment, region }) {
-  if (!commandExists('aws')) {
-    warn('AWS CLI not found; cannot auto-adopt existing S3 bucket.');
-    return false;
+async function tryAdoptArtifactsBucket({ repoRoot, tfvarsPath, environment, region, bucketNameHint }) {
+  let bucketName = (bucketNameHint || '').trim();
+
+  if (!bucketName) {
+    if (!commandExists('aws')) {
+      warn('AWS CLI not found and bucket name was not detected from Terraform output; cannot auto-adopt S3 bucket.');
+      return false;
+    }
+
+    const env = {
+      ...process.env,
+      AWS_REGION: region,
+      AWS_DEFAULT_REGION: region,
+      AWS_PAGER: '',
+    };
+
+    const whoami = await runCommandCapture('aws', ['sts', 'get-caller-identity', '--query', 'Account', '--output', 'text'], {
+      cwd: repoRoot,
+      env,
+    });
+
+    if (whoami.code !== 0) {
+      warn('Could not determine AWS account ID to compute bucket name; skipping auto-adopt.');
+      return false;
+    }
+
+    const accountId = whoami.stdout.trim();
+    if (!accountId) return false;
+    bucketName = `${environment}-ft-iac-artifacts-${accountId}-${region}`.toLowerCase().replace(/_/g, '-');
   }
 
-  const env = {
-    ...process.env,
-    AWS_REGION: region,
-    AWS_DEFAULT_REGION: region,
-    AWS_PAGER: '',
-  };
-
-  const whoami = await runCommandCapture('aws', ['sts', 'get-caller-identity', '--query', 'Account', '--output', 'text'], {
-    cwd: repoRoot,
-    env,
-  });
-
-  if (whoami.code !== 0) {
-    warn('Could not determine AWS account ID to compute bucket name; skipping auto-adopt.');
-    return false;
-  }
-
-  const accountId = whoami.stdout.trim();
-  if (!accountId) return false;
-
-  const bucketName = `${environment}-ft-iac-artifacts-${accountId}-${region}`.toLowerCase().replace(/_/g, '-');
   info(`Attempting to adopt existing S3 bucket into state: ${bucketName}`);
 
   const base = ['-chdir=terraform', 'import', `-var-file=${tfvarsPath}`];
@@ -199,6 +203,121 @@ async function tryAdoptArtifactsBucket({ repoRoot, tfvarsPath, environment, regi
 
   ok('Artifacts bucket adopted (import attempted).');
   return true;
+}
+
+async function tryAdoptIamRoleAndProfile({ repoRoot, tfvarsPath, roleName, profileName, env }) {
+  if (!roleName && !profileName) return false;
+
+  let adopted = false;
+
+  if (roleName) {
+    info(`Attempting to adopt existing IAM role into state: ${roleName}`);
+    const roleCode = await runCommandAllowFailure(
+      'terraform',
+      ['-chdir=terraform', 'import', `-var-file=${tfvarsPath}`, 'aws_iam_role.ssm_role', roleName],
+      { cwd: repoRoot, env },
+    );
+
+    if (roleCode === 0) {
+      ok('IAM role adopted into state (import succeeded).');
+      adopted = true;
+    } else {
+      warn('IAM role import failed; continuing.');
+    }
+  }
+
+  if (profileName) {
+    info(`Attempting to adopt existing IAM instance profile into state: ${profileName}`);
+    const profileCode = await runCommandAllowFailure(
+      'terraform',
+      ['-chdir=terraform', 'import', `-var-file=${tfvarsPath}`, 'aws_iam_instance_profile.ssm_profile', profileName],
+      { cwd: repoRoot, env },
+    );
+
+    if (profileCode === 0) {
+      ok('IAM instance profile adopted into state (import succeeded).');
+      adopted = true;
+    } else {
+      warn('IAM instance profile import failed; continuing.');
+    }
+  }
+
+  return adopted;
+}
+
+function extractConflictHints(terraformOutput) {
+  const text = terraformOutput || '';
+
+  const keyPairName = (text.match(/Key Pair \(([^)]+)\)/) || [])[1] || '';
+  const bucketName = (text.match(/creating S3 Bucket \(([^)]+)\)/) || [])[1] || '';
+
+  const roleName =
+    (text.match(/Role with name ([^\s:]+) already exists/i) || [])[1]
+    || (text.match(/creating IAM Role \(([^)]+)\)/i) || [])[1]
+    || '';
+
+  const profileName =
+    (text.match(/Instance Profile with name ([^\s:]+) already exists/i) || [])[1]
+    || (text.match(/Instance Profile ([^\s:]+) already exists/i) || [])[1]
+    || (text.match(/creating IAM Instance Profile \(([^)]+)\)/i) || [])[1]
+    || '';
+
+  return {
+    keyPairName,
+    bucketName,
+    roleName,
+    profileName,
+  };
+}
+
+async function tryAutoAdoptConflicts({
+  combinedOutput,
+  repoRoot,
+  tfvarsPath,
+  environment,
+  region,
+  sshKeyName,
+  env,
+}) {
+  const hints = extractConflictHints(combinedOutput);
+  let adoptedAny = false;
+
+  if (combinedOutput.includes('InvalidKeyPair.Duplicate')) {
+    warn('EC2 key pair already exists (likely created previously). Auto-adopting it into state...');
+    const adopted = await tryAdoptEc2KeyPair({
+      repoRoot,
+      tfvarsPath,
+      keyName: hints.keyPairName || sshKeyName,
+      env,
+    });
+    adoptedAny = adoptedAny || adopted;
+  }
+
+  if (combinedOutput.includes('BucketAlreadyOwnedByYou')) {
+    warn('S3 bucket already exists (likely created previously). Auto-adopting it into state...');
+    const adopted = await tryAdoptArtifactsBucket({
+      repoRoot,
+      tfvarsPath,
+      environment,
+      region,
+      bucketNameHint: hints.bucketName,
+    });
+    adoptedAny = adoptedAny || adopted;
+  }
+
+  if (combinedOutput.includes('EntityAlreadyExists') && (hints.roleName || hints.profileName)) {
+    warn('IAM resource already exists (likely created previously). Auto-adopting it into state...');
+    const adopted = await tryAdoptIamRoleAndProfile({
+      repoRoot,
+      tfvarsPath,
+      roleName: hints.roleName,
+      profileName: hints.profileName,
+      env,
+    });
+    adoptedAny = adoptedAny || adopted;
+  }
+
+  return adoptedAny;
 }
 
 async function tryAdoptEc2KeyPair({ repoRoot, tfvarsPath, keyName, env }) {
@@ -514,41 +633,24 @@ async function main() {
 
     if (applyAttempt1.code !== 0) {
       const combined = `${applyAttempt1.stdout}\n${applyAttempt1.stderr}`;
-      if (combined.includes('InvalidKeyPair.Duplicate')) {
-        warn('EC2 key pair already exists (likely created previously). Auto-adopting it into state and retrying apply once...');
-        const importedName = (combined.match(/Key Pair \(([^)]+)\)/) || [])[1];
-        const adopted = await tryAdoptEc2KeyPair({
-          repoRoot,
-          tfvarsPath,
-          keyName: importedName || sshKeyName,
+      const adoptedAny = await tryAutoAdoptConflicts({
+        combinedOutput: combined,
+        repoRoot,
+        tfvarsPath,
+        environment,
+        region: chosenRegion.region,
+        sshKeyName,
+        env: tfEnv,
+      });
+
+      if (adoptedAny) {
+        info('Retrying terraform apply once after auto-adopt...');
+        await runCommand('terraform', ['-chdir=terraform', 'apply', '-auto-approve', `-var-file=${tfvarsPath}`], {
+          cwd: repoRoot,
           env: tfEnv,
         });
-        if (adopted) {
-          await runCommand('terraform', ['-chdir=terraform', 'apply', '-auto-approve', `-var-file=${tfvarsPath}`], {
-            cwd: repoRoot,
-            env: tfEnv,
-          });
-        } else {
-          throw new Error('Terraform apply failed and key pair auto-adopt was not possible.');
-        }
-      } else if (combined.includes('BucketAlreadyOwnedByYou')) {
-        warn('S3 bucket already exists (likely created previously). Auto-adopting it into state and retrying apply once...');
-        const adopted = await tryAdoptArtifactsBucket({
-          repoRoot,
-          tfvarsPath,
-          environment,
-          region: chosenRegion.region,
-        });
-        if (adopted) {
-          await runCommand('terraform', ['-chdir=terraform', 'apply', '-auto-approve', `-var-file=${tfvarsPath}`], {
-            cwd: repoRoot,
-            env: tfEnv,
-          });
-        } else {
-          throw new Error('Terraform apply failed and bucket auto-adopt was not possible.');
-        }
       } else {
-        throw new Error('Terraform apply failed.');
+        throw new Error('Terraform apply failed and auto-adopt was not possible.');
       }
     }
 
@@ -632,25 +734,24 @@ async function main() {
 
           if (tlsApplyAttempt1.code !== 0) {
             const combined = `${tlsApplyAttempt1.stdout}\n${tlsApplyAttempt1.stderr}`;
-            if (combined.includes('InvalidKeyPair.Duplicate')) {
-              warn('EC2 key pair already exists. Auto-adopting it into state and retrying apply once...');
-              const importedName = (combined.match(/Key Pair \(([^)]+)\)/) || [])[1];
-              const adopted = await tryAdoptEc2KeyPair({
-                repoRoot,
-                tfvarsPath,
-                keyName: importedName || sshKeyName,
+            const adoptedAny = await tryAutoAdoptConflicts({
+              combinedOutput: combined,
+              repoRoot,
+              tfvarsPath,
+              environment,
+              region: chosenRegion.region,
+              sshKeyName,
+              env: tlsEnv,
+            });
+
+            if (adoptedAny) {
+              info('Retrying terraform apply once after auto-adopt...');
+              await runCommand('terraform', ['-chdir=terraform', 'apply', '-auto-approve', `-var-file=${tfvarsPath}`], {
+                cwd: repoRoot,
                 env: tlsEnv,
               });
-              if (adopted) {
-                await runCommand('terraform', ['-chdir=terraform', 'apply', '-auto-approve', `-var-file=${tfvarsPath}`], {
-                  cwd: repoRoot,
-                  env: tlsEnv,
-                });
-              } else {
-                throw new Error('Terraform apply failed and key pair auto-adopt was not possible.');
-              }
             } else {
-              throw new Error('Terraform apply failed.');
+              throw new Error('Terraform apply failed and auto-adopt was not possible.');
             }
           }
 
