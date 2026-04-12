@@ -178,9 +178,9 @@ variable "app_upstream_port" {
 }
 
 variable "app_health_path" {
-  description = "HTTP path used for health checks (ALB + instance bootstrap). Prefer readiness so traffic starts only when DB is available."
+  description = "HTTP path used for health checks (ALB + instance bootstrap). Liveness keeps the load balancer from marking a booted app unhealthy while the app manages its own DB retries."
   type        = string
-  default     = "/health/readiness"
+  default     = "/health/liveness"
 }
 
 variable "docker_compose_version" {

@@ -29,25 +29,22 @@ async function bootstrap() {
 
   let sessionStore: session.Store | undefined;
   const hasDbConfig = Boolean(mysqlHost && mysqlUser && mysqlPassword && mysqlDatabase);
-  if (hasDbConfig) {
+  const useMySqlSessionStore = (configService.get<string>('USE_MYSQL_SESSION_STORE') || '').trim().toLowerCase() === 'true';
+  if (hasDbConfig && useMySqlSessionStore) {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const MySQLStoreFactory = require('express-mysql-session');
     const MySQLStore = MySQLStoreFactory(session);
-    sessionStore = new MySQLStore(
-      {
-        // Create a dedicated sessions table; keep the name stable.
-        schema: {
-          tableName: 'sessions',
-        },
+    sessionStore = new MySQLStore({
+      host: mysqlHost,
+      port: mysqlPort,
+      user: mysqlUser,
+      password: mysqlPassword,
+      database: mysqlDatabase,
+      // Create a dedicated sessions table; keep the name stable.
+      schema: {
+        tableName: 'sessions',
       },
-      {
-        host: mysqlHost,
-        port: mysqlPort,
-        user: mysqlUser,
-        password: mysqlPassword,
-        database: mysqlDatabase,
-      },
-    );
+    });
   }
 
   // Express session middleware setup

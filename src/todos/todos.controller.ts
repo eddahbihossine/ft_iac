@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Render, Delete, HttpException, InternalServerErrorException, Res, Session, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Render, Delete, HttpException, InternalServerErrorException, Res, Session, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { TodosService } from './todos.service';
 import { CreateTodoDto } from './dto/create-todo.dto';
 import { UpdateTodoDto } from './dto/update-todo.dto';
@@ -46,8 +46,13 @@ export class TodosController {
     if (session.user.id !== +userId)
       throw new UnauthorizedException();
 
-    // @ts-ignore because only user id is necessary
-    await this.todosService.create({ ...createTodoDto, user: { id: +userId } });
+    const title = (createTodoDto?.title || '').trim();
+    const description = (createTodoDto?.description || '').trim();
+    if (!title || !description) {
+      throw new BadRequestException('Both title and description are required.');
+    }
+
+    await this.todosService.create({ title, description, user: { id: +userId } });
     return res.redirect(`/todos/${session.user.id}`);
   }
 

@@ -13,14 +13,16 @@ export class TodosService {
   /**
    * @returns Todo created id
    */
-  async create(createTodoDto: Omit<CreateTodoDto, 'id' | 'completed'>): Promise<number> {
-    const insertResult = await this.todosRepository.insert(createTodoDto);
+  async create(createTodoDto: { title: string; description: string; user: { id: number } }): Promise<number> {
+    const todo = this.todosRepository.create({
+      ...createTodoDto,
+      completed: false,
+    });
+    const createdTodo = await this.todosRepository.save(todo);
 
-    const newTodoId = insertResult.identifiers[0].id;
+    Logger.service.debug(`Todo "${createdTodo.id}" created`, { service: TodosService, rawData: createdTodo });
 
-    Logger.service.debug(`Todo "${newTodoId}" created`, { service: TodosService, rawData: { insertResult } });
-
-    return newTodoId;
+    return createdTodo.id;
   }
 
   async findAll(): Promise<Todo[]> {
