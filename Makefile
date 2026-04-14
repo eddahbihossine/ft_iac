@@ -1,4 +1,4 @@
-.PHONY: help build up down restart logs logs-api logs-db logs-adminer clean rebuild shell-api shell-db ps health install check-deploy-tools deploy test lint format tf-init tf-plan tf-apply tf-ssl-plan tf-ssl-apply
+.PHONY: help build up down restart logs logs-api logs-db logs-adminer clean rebuild shell-api shell-db ps health install check-deploy-tools deploy destroy test lint format tf-init tf-plan tf-apply tf-ssl-plan tf-ssl-apply
 
 # Default target
 help: ## Show this help message
@@ -73,6 +73,9 @@ install: ## Install dependencies locally
 
 deploy: check-deploy-tools ## Run interactive Terraform deploy CLI
 	pnpm i && pnpm run deploy
+
+destroy: ## Run interactive Terraform destroy CLI
+	pnpm run destroy
 
 dev: ## Run development server locally
 	pnpm run start:dev
